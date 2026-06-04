@@ -1,3 +1,4 @@
+# SmartCode AI
 # 🧠 Conversational AI Code Debugger
 
 A smart, conversational AI-powered debugging assistant built using **Streamlit** and **LangChain**. This tool helps developers understand errors and solve problems without directly giving code solutions — encouraging deeper learning and problem-solving skills.
