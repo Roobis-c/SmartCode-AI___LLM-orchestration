@@ -10,12 +10,28 @@ from langchain_core.output_parsers import StrOutputParser
 # ------------------ SETUP ------------------
 load_dotenv()
 
-st.set_page_config(page_title="AI Code Debugger", layout="centered")
-st.title("🧠 Conversational AI Code Debugger")
+st.set_page_config(page_title="AI Coding Tutor", layout="centered")
+st.title("AI Coding Tutor")
+
+# ------------------ BLINKING CSS ------------------
+st.markdown("""
+<style>
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+.blinking-text {
+    animation: blink 1s infinite;
+    font-weight: bold;
+    color: #4CAF50;
+    font-size: 18px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ------------------ LLM ------------------
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-pro",
+    model="models/gemini-2.5-flash",
     temperature=0.3
 )
 
@@ -25,7 +41,6 @@ parser = StrOutputParser()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Convert chat history into text format
 def get_history():
     return "\n".join(
         [f"{msg['role']}: {msg['content']}" for msg in st.session_state.messages]
@@ -47,7 +62,8 @@ debug_prompt = ChatPromptTemplate.from_template("""
 Conversation so far:
 {history}
 
-You are an AI debugging assistant. Respond in medium-length (not too long or too short)
+You are an AI debugging assistant.
+
 STRICT RULES:
 - DO NOT provide corrected code
 - DO NOT rewrite the code
@@ -64,7 +80,9 @@ approach_prompt = ChatPromptTemplate.from_template("""
 Conversation so far:
 {history}
 
-You are an algorithm mentor.Respond in medium-length (not too long or too short)
+You are an algorithm mentor.
+
+Respond in short content.stick to the point
 
 STRICT RULES:
 - DO NOT write full code
@@ -84,8 +102,12 @@ approach_chain = approach_prompt | llm | parser
 # ------------------ GUARDRAILS ------------------
 def contains_code(text):
     patterns = [
-        r"\bdef\b", r"\bclass\b", r"{.*}", r";",
-        r"#include", r"console\.log"
+        r"\bdef\b",
+        r"\bclass\b",
+        r"{.*}",
+        r";",
+        r"#include",
+        r"console\.log"
     ]
     return any(re.search(p, text) for p in patterns)
 
@@ -120,6 +142,18 @@ if user_input:
     try:
         history = get_history()
 
+        # Blinking placeholder
+        loading_placeholder = st.empty()
+
+        loading_placeholder.markdown(
+            """
+            <div class="blinking-text">
+                 Generating response...
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
         # Step 1: classify
         intent = classifier_chain.invoke({
             "input": user_input
@@ -131,14 +165,29 @@ if user_input:
                 "input": user_input,
                 "history": history
             })
-            response = enforce_no_code(response, debug_chain, user_input, history)
+
+            response = enforce_no_code(
+                response,
+                debug_chain,
+                user_input,
+                history
+            )
 
         else:
             response = approach_chain.invoke({
                 "input": user_input,
                 "history": history
             })
-            response = enforce_no_code(response, approach_chain, user_input, history)
+
+            response = enforce_no_code(
+                response,
+                approach_chain,
+                user_input,
+                history
+            )
+
+        # Remove blinking text
+        loading_placeholder.empty()
 
         # Store assistant response
         st.session_state.messages.append({
@@ -150,4 +199,5 @@ if user_input:
             st.write(response)
 
     except Exception as e:
+        loading_placeholder.empty()
         st.error(f"Error: {str(e)}")
